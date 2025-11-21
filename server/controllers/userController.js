@@ -1,5 +1,7 @@
 import imagekit from "../configs/img.js";
+import { inngest } from "../inngest/index.js";
 import Connection from "../models/Connections.js";
+import post from "../models/post.js";
 import User from "../models/User.js";
 import fs from "fs";
 
@@ -175,10 +177,16 @@ export const sendConnectionRequest = async (req, res) => {
     });
 
     if (!connection) {
-      await Connection.create({
+      const newconnection = await Connection.create({
         from_user_id: userId,
         to_user_id: id,
       });
+
+      await inngest.send({
+        name: "app/connection-request",
+        data: { connectionId: newconnection._id },
+      });
+
       return res.json({ success: true, message: "Connection request sent" });
     } else if (connection && connection.status === "accepted") {
       return res.json({ success: false, message: "You are already connected" });
@@ -248,6 +256,21 @@ export const acceptConnections = async (req, res) => {
     await connection.save();
 
     res.json({ success: true, message: "Connection request accepted" });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+export const getuserprofiles = async (req, res) => {
+  try {
+    const { profileId } = req.body;
+    const profile = await User.findById(profileId);
+    if (!profile) {
+      return res.json({ success: false, message: "User not found" });
+    }
+    const posts = await post.find({ user: profileId }).populate("user");
+    res.json({ success: true, profile, posts });
   } catch (error) {
     console.log(error);
     res.json({ success: false, message: error.message });

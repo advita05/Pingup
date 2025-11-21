@@ -2,6 +2,8 @@ import { Inngest } from "inngest";
 import User from "../models/User.js";
 import Connection from "../models/Connections.js";
 import sendEmail from "../configs/nodeMailer.js";
+import story from "../models/story.js";
+import message from "../models/message.js";
 
 // Create a client
 export const inngest = new Inngest({ id: "pingup-app" });
@@ -112,9 +114,65 @@ const sentnewconnectionemail = inngest.createFunction(
   }
 );
 
+const deletestory = inngest.createFunction(
+  { id: "story-delete" },
+  { event: "app/story.delete" },
+  async ({ event, step }) => {
+    const { storyId } = event.data;
+    const in24hours = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await step.sleepUntil("wait-24-hours", in24hours);
+    await step.run("delete-story", async () => {
+      await story.findByIdAndDelete(storyId);
+      return { message: "story deleted successfully" };
+    });
+  }
+);
+
+const sendnotificationofunseenmessages = inngest.createFunction(
+  { id: "send-unseen-messages-notification" },
+  {
+    cron: "TZ=America/New_York 0 9 * * *",
+  },
+  async ({ step }) => {
+    const messages = await message.find({ seen: false }).populate("to_user_id");
+    const unseencount = {};
+
+    messages.map((message) => {
+      unseencount[message.to_user_id._id] =
+        (unseencount[message.to_user_id._id] || 0) + 1;
+    });
+
+    for (const userId in unseencount) {
+      const user = await User.findById(userId);
+
+      const subject = `You have ${unseencount[userId]} unseen messages`;
+
+      const body = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+           <h2>Hi ${user.full_name},</h2>
+           <p>You have ${unseencount[userId]} unseen messages waiting for you on PingUp.</p>
+           <p>Click <a href="${process.env.FRONTEND_URL}/messages" style="color: #10b981;">here</a> to check your messages</p>
+           <br/>
+           <p>Thanks,<br/>PingUp - Stay Connected</p>
+      </div>;`;
+
+      await sendEmail({
+        to: user.email,
+        subject,
+        body,
+      });
+    }
+    return{
+      message: "Unseen messages notification sent successfully",
+    }
+  }
+);
+
 export const functions = [
   syncUserCreation,
   syncUserUpdation,
   syncUserDeletion,
   sentnewconnectionemail,
+  deletestory,
+  sendnotificationofunseenmessages
 ];
