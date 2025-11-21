@@ -97,7 +97,7 @@ const getrecentmessages = async (req, res) => {
   try {
     const { userId } = req.auth;
     const messages = await message
-      .find(
+      .findById(
         {
           to_user_id: userId,
         }.populate("from_user_id")
@@ -108,3 +108,5 @@ const getrecentmessages = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
+export { getmessage, getrecentmessages };

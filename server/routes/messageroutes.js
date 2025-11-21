@@ -4,9 +4,9 @@ import {
   ssecontroller,
   getmessage,
 } from "../controllers/messagecontroller.js";
-import { protect } from "../middlewares/auth.js";
+import { protect } from "../middleware/auth.js";
 import { upload } from "../configs/multer.js";
-import message from "../models/message";
+import message from "../models/message.js";
 const messagerouter = express.Router();
 
 messagerouter.get("/:userId", ssecontroller);
